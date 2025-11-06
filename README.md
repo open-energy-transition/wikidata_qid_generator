@@ -3,7 +3,7 @@
 The **Wikidata QID Generator** automates the transformation of national electricity lines and circuits datasets into **QuickStatements (QS)** files for Wikidata batch upload.  
 It also provides a generalized method to enrich datasets with Wikidata **QIDs** after upload or for cross-verification.
 
-All stages are managed through the `harmonize_config.yaml` file — enabling reproducible and scalable workflows across datasets such as **UPME**, **MHE**, or **SIGET**.
+All stages are managed through the `harmonize_config.yaml` file — enabling reproducible and scalable workflows across datasets such as the ones presents for Colombia in UPME or for Bolivia in their interactive map.
 
 ---
 
