@@ -11,7 +11,7 @@ This repository provides a reproducible workflow that converts raw GIS or tabula
 | File | Description |
 |------|-------------|
 | `harmonize_transmission_data.py` | Harmonizes raw input data into a unified schema readable by the QS generator. Produces files like `*_harmonized_for_qs.csv`. |
-| `generalized_merge_qids.py` | **New module.** Merges Wikidata QIDs into harmonized CSVs based on configured matching properties. Supports any dataset defined in `harmonize_config.yaml`. |
+| `generalized_merge_qids.py` | **New module.** Merges Wikidata QIDs into datasets based on configured matching properties. |
 | `generate_qs_csv_updated.py` | Converts harmonized or enriched CSVs into **Wikidata QuickStatements** (no `P1114`), using YAML configuration for references and metadata. |
 | `harmonize_config.yaml` | Defines country metadata, data sources (QIDs/URLs), access time, and per-dataset column mappings and Wikidata match properties. |
 
