@@ -162,7 +162,7 @@ P2043:  +146720.0U828224
 ## How It Works (Under the Hood)
 
 1. **Harmonization**
-   - Robust CSV reader (UTF‑8/BOM, repairs single‑cell‑row exports).
+   - Robust CSV reader (UTF‑8/BOM).
    - Column detection via candidate lists; value transforms (e.g., `km_to_m`).
    - Optional WKT → JSON conversion for geometries; preserves raw if parsing fails.
    - Emits a minimal, consistent schema for all downstream steps.
