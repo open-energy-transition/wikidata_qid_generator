@@ -103,7 +103,7 @@ This is useful for maintaining data consistency and enabling bidirectional linka
 
 #### Basic Command
 ```bash
-python generalized_merge_qids.py   --input data/input/upme_lineas_harmonized_for_qs.csv   --output data/output/upme_lineas_enriched.csv
+python generalized_merge_qids.py --input input_file.csv --output output_file.csv --config harmonize_config.yaml
 ```
 
 #### What It Does
