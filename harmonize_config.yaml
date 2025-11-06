@@ -1,3 +1,7 @@
+# ===========================================================
+# Harminization and QID generartion configuration
+# ===========================================================
+
 inputs:
   - path: upme_lineas.csv
     profile: qs_input_schema
@@ -69,3 +73,22 @@ profiles:
       _coords_json:    # WKT/GeoJSON/array -> MultiLine array JSON
         candidates: [_coords_json, location, geometry, wkt, GEOMETRY]
         transform: to_coords_json
+
+
+# ===========================================================
+# Wikidata merge configuration
+# ===========================================================
+wikidata_merge:
+  user_agent: "OET-wikidata-qid-generator/merge (mailto:info@openenergytransition.org)"
+  wikidata_match_props: ["P528"]
+
+  # Optional: custom naming heuristics for the code column
+  code_candidates: ["Codigo", "codigo", "id_circuito", "Code", "code", "ID", "id"]
+
+  # Optional: control query performance (defaults are good)
+  batch_size: 50
+  throttle: 3.0
+  retries: 5
+  backoff: 1.6
+  language: "es, en"
+
