@@ -1,0 +1,71 @@
+inputs:
+  - path: upme_lineas.csv
+    profile: qs_input_schema
+    country:
+      label: "Colombia"
+      country_qid: "Q739"
+      source_qid: "Q136714077"              
+      source_url: "https://geo.upme.gov.co/server/rest/services/Capas_EnergiaElectrica/Sistema_transmision_lineas_construidas/FeatureServer/17" # TODO
+      access_time: "+2025-11-05T00:00:00Z/11"
+    columns:
+      Long:
+        candidates: [longitud_tramo_km, Long, Shape__Length]
+        transform: km_to_m
+      _coords_json:
+        candidates: [location, _coords_json, geometry, wkt]
+        transform: to_coords_json
+      Un:
+        candidates: [tension, Un, nivel_tension_circuito]
+        transform: to_number_str
+      Codigo:
+        candidates: [id_circuito, Codigo, code, CODIGO, ID]
+      TRAMO:
+        candidates: [nombre_circuito, nombre_trazado, TRAMO, NAME, NOMBRE]
+
+  - path: bolivia_lineas_construidas.csv
+    profile: qs_input_schema
+    country:
+      label: "Bolivia"
+      country_qid: "Q750"
+      source_qid: "QXXXX_BOLIVIA_DATASET"     # TODO
+      source_url: "https://<bolivia-dataset-url>" # TODO
+      access_time: "+2025-11-05T00:00:00Z/11"
+    columns:
+      Long:
+        candidates: [longitud_km, Long]
+        transform: km_to_m
+      _coords_json:
+        candidates: [location, _coords_json, geometry, wkt]
+        transform: to_coords_json
+      Un:
+        candidates: [tension_kV, Un]
+        transform: to_number_str
+      Codigo:
+        candidates: [codigo, Codigo, id]
+      TRAMO:
+        candidates: [tramo, TRAMO, nombre]
+
+profiles:
+  qs_input_schema:
+    columns:
+      qid:
+        candidates: [qid, QID]
+        transform: passthrough
+      Codigo:
+        candidates: [Codigo, id_circuito, code, CODIGO, ID]
+        transform: passthrough
+      TRAMO:
+        candidates: [TRAMO, nombre_circuito, nombre_trazado, tramo, NAME, NOMBRE, nombre]
+        transform: passthrough
+      Un:              # kV in source; QS will convert to V with unit
+        candidates: [Un, tension, VOLTAJE_kV, nivel_tension_circuito]
+        transform: to_number_str
+      Long:            # default assumes metres; override per input if km
+        candidates: [Long, length_m, longitud_m, longitud, longitud_tramo_km, long_km]
+        transform: m_passthrough
+      _feature_id:
+        candidates: [_feature_id, fid, OBJECTID, ID_TRAMO, ID_SEGMENTO]
+        transform: passthrough
+      _coords_json:    # WKT/GeoJSON/array -> MultiLine array JSON
+        candidates: [_coords_json, location, geometry, wkt, GEOMETRY]
+        transform: to_coords_json
