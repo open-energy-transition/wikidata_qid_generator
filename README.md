@@ -1,6 +1,6 @@
 # Wikidata QID Generator
 
-The **Wikidata QID Generator** automates the transformation of national electricity datasets into **QuickStatements (QS)** files for Wikidata batch upload.  
+The **Wikidata QID Generator** automates the transformation of national electricity lines and circuits datasets into **QuickStatements (QS)** files for Wikidata batch upload.  
 It also provides a generalized method to enrich datasets with Wikidata **QIDs** after upload or for cross-verification.
 
 All stages are managed through the `harmonize_config.yaml` file — enabling reproducible and scalable workflows across datasets such as **UPME**, **MHE**, or **SIGET**.
@@ -126,32 +126,94 @@ python generalized_merge_qids.py   --input data/input/upme_lineas_harmonized_for
 
 ## 🧾 YAML Configuration Example (`harmonize_config.yaml`)
 
-All stages use the same configuration file for consistency and reproducibility.
+All stages use the same configuration file for consistency and reproducibility. Whenever a new dataset is added check for the candidates in the columns data to add a new name if missing so that the generator works.
 
-```yaml
+```inputs:
+  - path: upme_lineas.csv
+    profile: qs_input_schema
+    country:
+      label: "Colombia"
+      country_qid: "Q739"
+      source_qid: "Q136714077"              
+      source_url: "https://geo.upme.gov.co/server/rest/services/Capas_EnergiaElectrica/Sistema_transmision_lineas_construidas/FeatureServer/17" # TODO
+      access_time: "+2025-11-05T00:00:00Z/11"
+    columns:
+      Long:
+        candidates: [longitud_tramo_km, Long, Shape__Length]
+        transform: km_to_m
+      _coords_json:
+        candidates: [location, _coords_json, geometry, wkt]
+        transform: to_coords_json
+      Un:
+        candidates: [tension, Un, nivel_tension_circuito]
+        transform: to_number_str
+      Codigo:
+        candidates: [id_circuito, Codigo, code, CODIGO, ID]
+      TRAMO:
+        candidates: [nombre_circuito, nombre_trazado, TRAMO, NAME, NOMBRE]
+
+  - path: bolivia_lineas_construidas.csv
+    profile: qs_input_schema
+    country:
+      label: "Bolivia"
+      country_qid: "Q750"
+      source_qid: "QXXXX_BOLIVIA_DATASET"     # TODO
+      source_url: "https://<bolivia-dataset-url>" # TODO
+      access_time: "+2025-11-05T00:00:00Z/11"
+    columns:
+      Long:
+        candidates: [longitud_km, Long]
+        transform: km_to_m
+      _coords_json:
+        candidates: [location, _coords_json, geometry, wkt]
+        transform: to_coords_json
+      Un:
+        candidates: [tension_kV, Un]
+        transform: to_number_str
+      Codigo:
+        candidates: [codigo, Codigo, id]
+      TRAMO:
+        candidates: [tramo, TRAMO, nombre]
+
+profiles:
+  qs_input_schema:
+    columns:
+      qid:
+        candidates: [qid, QID]
+        transform: passthrough
+      Codigo:
+        candidates: [Codigo, id_circuito, code, CODIGO, ID]
+        transform: passthrough
+      TRAMO:
+        candidates: [TRAMO, nombre_circuito, nombre_trazado, tramo, NAME, NOMBRE, nombre]
+        transform: passthrough
+      Un:              # kV in source; QS will convert to V with unit
+        candidates: [Un, tension, VOLTAJE_kV, nivel_tension_circuito]
+        transform: to_number_str
+      Long:            # default assumes metres; override per input if km
+        candidates: [Long, length_m, longitud_m, longitud, longitud_tramo_km, long_km]
+        transform: m_passthrough
+      _feature_id:
+        candidates: [_feature_id, fid, OBJECTID, ID_TRAMO, ID_SEGMENTO]
+        transform: passthrough
+      _coords_json:    # WKT/GeoJSON/array -> MultiLine array JSON
+        candidates: [_coords_json, location, geometry, wkt, GEOMETRY]
+        transform: to_coords_json
+
 wikidata_merge:
-  wikidata_match_props: ["P528", "P712"]
-  user_agent: "OET-wikidata-qid-generator/1.0"
+  user_agent: "OET-wikidata-qid-generator/merge (mailto:info@openenergytransition.org)"
+  wikidata_match_props: ["P528"]
+
+  # Optional: custom naming heuristics for the code column
   code_candidates: ["Codigo", "codigo", "id_circuito", "Code", "code", "ID", "id"]
-  batch_size: 75
+
+  # Optional: control query performance (defaults are good)
+  batch_size: 50
   throttle: 3.0
   retries: 5
   backoff: 1.6
-  language: "es"
+  language: "es, en"
 
-datasets:
-  - name: upme_lineas
-    path: "data/input/upme_lineas_harmonized_for_qs.csv"
-    output: "data/output/upme_lineas_enriched.csv"
-    match_keys: ["Codigo"]
-    wikidata_properties: ["P528", "P712"]
-    schema:
-      country: "Colombia"
-      P17: "Q739"
-      P31: "Q2144320"
-      S248: "Q136714077"
-      s854: "https://geo.upme.gov.co/layers/geonode:transmision_sin_20250131"
-      s813: "+2025-10-16T00:00:00Z/11"
 ```
 
 ---
