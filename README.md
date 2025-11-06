@@ -2,7 +2,7 @@
 
 A lightweight Python toolset to harmonize national electricity datasets and generate **QuickStatements (QS)** files for batch uploads to **Wikidata**.
 
-This repository provides a reproducible workflow that converts raw GIS or tabular data (e.g., **UPME**, **MHE**, **SIGET**) into properly referenced Wikidata items for power‑grid infrastructure such as **transmission lines**, **substations**, or **power plants**.
+This repository provides a reproducible workflow that converts raw GIS or tabular data (e.g., **UPME**, **MHE**, **SIGET**) into properly referenced Wikidata items for power-grid infrastructure such as **transmission lines**, **substations**, or **power plants**.
 
 ---
 
@@ -10,9 +10,10 @@ This repository provides a reproducible workflow that converts raw GIS or tabula
 
 | File | Description |
 |------|-------------|
-| `harmonize_transmission_data.py` | Harmonizes raw input data into a unified, minimal schema readable by the QS generator. Produces files like `*_harmonized_for_qs.csv`. |
-| `generate_qs_csv_updated.py` | Converts harmonized CSVs into **Wikidata QuickStatements** (no `P1114`), using YAML configuration for references/metadata. |
-| `harmonize_config.yaml` | Defines country metadata, data sources (QIDs/URLs), access time, and per‑dataset column mappings / transforms. |
+| `harmonize_transmission_data.py` | Harmonizes raw input data into a unified schema readable by the QS generator. Produces files like `*_harmonized_for_qs.csv`. |
+| `generalized_merge_qids.py` | **New module.** Merges Wikidata QIDs into harmonized CSVs based on configured matching properties. Supports any dataset defined in `harmonize_config.yaml`. |
+| `generate_qs_csv_updated.py` | Converts harmonized or enriched CSVs into **Wikidata QuickStatements** (no `P1114`), using YAML configuration for references and metadata. |
+| `harmonize_config.yaml` | Defines country metadata, data sources (QIDs/URLs), access time, and per-dataset column mappings and Wikidata match properties. |
 
 ---
 
@@ -23,7 +24,7 @@ This repository provides a reproducible workflow that converts raw GIS or tabula
 
 ### Dependencies
 ```bash
-pip install pandas pyyaml
+pip install pandas pyyaml requests
 ```
 
 Optional (for development):
@@ -35,9 +36,9 @@ python -m pip install ruff black
 
 ## Usage
 
-### 1) Harmonize the source data
+### 1) Harmonize the Source Data
 
-Prepare the raw CSV from your source (e.g., UPME, MHE, SIGET) and configure its mapping in `harmonize_config.yaml` (see **Configuration** below).  
+Prepare the raw CSV from your source dataset and configure its mapping in `harmonize_config.yaml`.  
 Then run:
 
 ```bash
@@ -50,151 +51,139 @@ This creates a harmonized file, for example:
 upme_lineas_harmonized_for_qs.csv
 ```
 
-with the following columns **in this exact order**:
+with standardized column order:
 
 ```
 country,qid,Codigo,TRAMO,Un,Long,_feature_id,_coords_json
 ```
 
-**Column meanings**
-- `country` — human label from YAML (e.g., `Colombia`)
+**Column meanings:**
+- `country` — country name from YAML (e.g., `Colombia`)
 - `qid` — existing Wikidata QID for the asset (leave blank to create new)
-- `Codigo` — your dataset’s line/segment code
-- `TRAMO` — human‑readable section name/description
-- `Un` — nominal voltage (kV by default; see YAML to override)
-- `Long` — length (metres or kilometres; convert via mapping)
-- `_feature_id` — stable ID (hash) used only to generate a deterministic token for descriptions
-- `_coords_json` — geometry as **JSON** (list of coordinates) or **WKT** (`LINESTRING(...)` / `MULTILINESTRING(...)`)
+- `Codigo` — unique dataset code or circuit ID
+- `TRAMO` — human-readable section name/description
+- `Un` — nominal voltage (kV by default)
+- `Long` — line length (metres or kilometres)
+- `_feature_id` — deterministic unique ID (hash)
+- `_coords_json` — geometry as JSON or WKT (`LINESTRING(...)`)
 
 ---
 
-### 2) Generate the QuickStatements CSV
+### 2) Merge Wikidata QIDs (New Generalized Stage)
 
-Use the harmonized file as input for the generator:
+The **`generalized_merge_qids.py`** script replaces dataset-specific merge logic.  
+It reads harmonized CSVs, matches codes against Wikidata, and merges existing QIDs automatically.
+
+Run:
+```bash
+python generalized_merge_qids.py
+```
+
+#### Functionality
+- Reads dataset definitions from `harmonize_config.yaml`
+- Loads each harmonized CSV
+- Uses declared matching properties (e.g., `P528`, `P712`) to query Wikidata
+- Matches on identifiers (e.g., `Codigo`, `id_circuito`)
+- Merges discovered QIDs into the dataset
+- Produces a unified summary:
+  ```
+  [SUMMARY] rows=512 | with_qid=489 | unresolved=23 | ambiguous=0
+  ```
+
+#### Example YAML Definition
+```yaml
+datasets:
+  - name: upme_lineas
+    path: data/input/upme_lineas_harmonized_for_qs.csv
+    output: data/output/upme_lineas_enriched.csv
+    match_keys: ["Codigo", "id_circuito"]
+    wikidata_properties: ["P528", "P712"]
+```
+
+#### Output
+- Enriched CSV with QIDs merged back (`*_enriched.csv`)
+- Summary logs of matched, unresolved, and ambiguous entries
+- Ready-to-use input for the next stage (`generate_qs_csv_updated.py`)
+
+---
+
+### 3) Generate QuickStatements
+
+Use the enriched file as input for QS generation:
 
 ```bash
-python generate_qs_csv_updated.py upme_lineas_harmonized_for_qs.csv
+python generate_qs_csv_updated.py upme_lineas_enriched.csv
 ```
 
-The output file will be:
-
+This creates a file like:
 ```
-qs_transmision_upload_no_p1114.csv
-```
-
-This file follows the required QuickStatements structure (each property block includes references from YAML):
-
-```
-qid,Len,Les,Den,Des,
-P31,S248,s854,s813,
-P17,S248,s854,s813,
-P625,S248,s854,s813,
-P528,S248,s854,s813,
-P2436,S248,s854,s813,
-P2043,S248,s854,s813
+qs_upme_lineas_no_p1114.csv
 ```
 
-**Notes**
-- `P31` is set to overhead power line (`Q2144320`).
-- `P17` (country), `S248` (stated in), `s854` (reference URL), `s813` (access time) are read from YAML.
-- `P625` is computed as the centroid of the provided geometry and supports **JSON**, **LINESTRING(...)**, and **MULTILINESTRING(...)**.
-- `P2436` (voltage) is emitted in **volts** with unit `U25250`. If your input is kV, set `voltage_unit: kV` (default) in YAML.
-- `P2043` (length) is emitted in **metres** with unit `U828224`.
+Each statement includes:
+- Instance type (`P31`)
+- Country (`P17`)
+- Coordinates (`P625`)
+- Code or identifier (`P528`)
+- Voltage (`P2436`)
+- Length (`P2043`)
+- Full reference metadata (`S248`, `s854`, `s813`)
 
 ---
 
-## Configuration (`harmonize_config.yaml`)
+## 🔧 Configuration Example (`harmonize_config.yaml`)
 
-Your YAML drives both *harmonization* and *QS generation*. The generator matches an input block to the harmonized CSV by **filename stem** (e.g., `upme_lineas.csv` ↔ `upme_lineas_harmonized_for_qs.csv`).
-
-### Minimal example
+Updated format supporting the generalized merge logic:
 
 ```yaml
-inputs:
-  - path: upme_lineas.csv
-    profile: qs_input_schema
-    country:
-      label: "Colombia"
-      country_qid: "Q739"           # P17
-      source_qid: "Q136714077"      # S248 (UPME dataset/item)
-      source_url: "https://geo.upme.gov.co/server/rest/services/.../Sistema_transmision_lineas_construidas/FeatureServer/17"
-      access_time: "+2025-11-05T00:00:00Z/11"  # s813
-    columns:
-      Long:
-        candidates: [longitud_tramo_km, Long, Shape__Length]
-        transform: km_to_m          # convert km → m
-      _coords_json:
-        candidates: [location, _coords_json, geometry, wkt]
-        transform: to_coords_json   # parse WKT MULTILINESTRING → JSON (fallback keeps raw)
-      Un:
-        candidates: [tension, Un, nivel_tension_circuito]
-        transform: to_number_str
-      Codigo:
-        candidates: [id_circuito, Codigo, code, CODIGO, ID]
-      TRAMO:
-        candidates: [nombre_circuito, nombre_trazado, TRAMO, NAME, NOMBRE]
+wikidata:
+  endpoint: "https://query.wikidata.org/sparql"
+  user_agent: "OET-wikidata/1.0"
+
+datasets:
+  - name: upme_lineas
+    path: "data/input/upme_lineas_harmonized_for_qs.csv"
+    output: "data/output/upme_lineas_enriched.csv"
+    match_keys: ["Codigo"]
+    wikidata_properties: ["P528"]
+    schema:
+      country: "Colombia"
+      P17: "Q739"
+      P31: "Q2144320"
+      S248: "Q136714077"
+      s854: "https://geo.upme.gov.co/layers/geonode:transmision_sin_20250131"
+      s813: "+2025-10-16T00:00:00Z/11"
 ```
 
-> You can add multiple `inputs` blocks—one per dataset (e.g., Bolivia, El Salvador).
+You can define multiple datasets under the same YAML, each with its own structure and Wikidata matching configuration.
 
 ---
 
-## Example
+### 4) Outputs
 
-**Input (harmonized)**
+After running all stages, your output folder will contain:
 
-```
-country,qid,Codigo,TRAMO,Un,Long,_feature_id,_coords_json
-Colombia,,CARTSMAR2301,LT Cartago - San Marcos 230 kV - 1,230.0,146720.0,c1aa46ab724c,"LINESTRING(-75.9097 4.7291, -76.4866 3.6071)"
-```
-
-**Resulting QS (selected fields)**
-
-```
-P625:   @4.159668675830926/-76.17644889624685
-P2436:  230000.0U25250
-P2043:  +146720.0U828224
-```
+| File | Description |
+|------|-------------|
+| `*_harmonized_for_qs.csv` | Standardized dataset ready for enrichment. |
+| `*_enriched.csv` | QID-merged file after `generalized_merge_qids.py`. |
+| `*_qs_no_p1114.csv` | QuickStatements upload file. |
 
 ---
 
+## 🧠 Summary of the New Functionality
 
-## How It Works (Under the Hood)
-
-1. **Harmonization**
-   - Robust CSV reader (UTF‑8/BOM).
-   - Column detection via candidate lists; value transforms (e.g., `km_to_m`).
-   - Optional WKT → JSON conversion for geometries; preserves raw if parsing fails.
-   - Emits a minimal, consistent schema for all downstream steps.
-
-2. **QS Generation**
-   - Reads metadata from YAML and builds fully referenced QS statements.
-   - Geometry parser supports JSON / `MULTILINESTRING` / `LINESTRING`.
-   - Tolerant numeric parsing for voltage/length; emits correct QS units.
-
----
-
-## QuickStatements Tips
-
-- Upload small batches first to validate descriptions/coords.  
-- Always include `S248` + `s854` + `s813` for data provenance.  
-- Prefer creating **items first** and then adding **statements** to avoid conflicts.
-
----
-
-## Contributing
-
-PRs are welcome. Please:
-- Keep code **idempotent** and **dataset‑agnostic**.
-- Avoid hardcoding country‑specific constants in code; use YAML.
-- Format with `black`, lint with `ruff`.
+| Feature | Description |
+|----------|-------------|
+| **Generalized QID Merge** | One script (`generalized_merge_qids.py`) handles QID enrichment for all datasets defined in YAML. |
+| **Config-Driven Logic** | No hardcoding — datasets, key fields, and matching Wikidata properties are all declared in YAML. |
+| **Automatic Reporting** | Prints counts of matched/unresolved items. |
+| **Scalable Architecture** | Easily extendable to other infrastructure layers (e.g., substations, generators). |
 
 ---
 
 ## Authors
-
 **Open Energy Transition (OET)**  
 <https://openenergytransition.org>
 
 ---
-
