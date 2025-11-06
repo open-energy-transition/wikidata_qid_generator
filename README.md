@@ -33,7 +33,7 @@ python -m pip install ruff black
 
 ---
 
-## 🚀 Usage
+## Usage
 
 ### 1) Harmonize the source data
 
@@ -191,13 +191,10 @@ PRs are welcome. Please:
 
 ---
 
-## 👥 Authors
+## Authors
 
 **Open Energy Transition (OET)**  
 <https://openenergytransition.org>
 
 ---
 
-## 🪪 License
-
-This project is released under the **MIT License**.
